@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 WINDOW_SIZE_MINUTE = 150
 STEP_SIZE_MINUTE = 15
-WINDOW_SIZE_INT = 11
+WINDOW_SIZE_INT = 10
 STEP_SIZE_INT = 1
 
 df = pd.read_csv("../data/plant_1_collate_raw.csv")
@@ -24,7 +24,7 @@ for row in range(0, len(df) - WINDOW_SIZE_INT + 1, STEP_SIZE_INT):
 
     for col in range(4, 7):
         col_data_array = df[column_headers[col]][row:(end_index + 1)]
-        mean_val= col_data_array.mean()
+        mean_val = col_data_array.mean()
         min_val = col_data_array.min()
         max_val = col_data_array.max()
         temp_tuple.append(mean_val)
