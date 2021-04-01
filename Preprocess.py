@@ -80,12 +80,16 @@ def fill_missing_data(plant):
 
 
 
-def collate_input():
-    df = pd.read_csv('Data/Extract/plant_2_collate_raw.csv', index_col=0)
+def collate_input(plant):
+    df = pd.read_csv('Data/Extract/plant_{}_collate_raw_filled.csv'.format(plant), index_col=0)
     df['time_feature'] = df['DATE_TIME'].apply(lambda x: get_time_mapping(x))
     feature_names = ["time_feature", "AMBIENT_TEMPERATURE", "MODULE_TEMPERATURE", "IRRADIATION"]
     inverter_output_names = ["DC_" + str(i) for i in range(config.NUM_INVERTER)]
     col_names = feature_names + inverter_output_names
+    time_df = df[['time']]
+
+
+
     df = df[col_names]
     ### scaling
     x = df.values
@@ -94,28 +98,23 @@ def collate_input():
     df = pd.DataFrame(x_scaled, columns=col_names)
 
 
-    total_feature_len = config.NUM_FEATURES*config.WINDOW_SIZE_INT
+    collate = []
+    for i in range(len(df) - config.WINDOW_SIZE_INT - config.NUM_OUTPUT + 1):
+        if time_df['time'].at[i+config.WINDOW_SIZE_INT + config.NUM_OUTPUT-1] - time_df['time'].at[i] != 900*13:
+            continue
 
-    num_data_points = (len(df) - config.WINDOW_SIZE_INT - config.NUM_OUPUT + 1) * config.NUM_INVERTER
-    collate = pd.DataFrame(index=np.arange(num_data_points), columns=np.arange(total_feature_len + config.NUM_OUPUT))
-    for i in range(len(df) - config.WINDOW_SIZE_INT - config.NUM_OUPUT + 1):
         for inverter_id in range(config.NUM_INVERTER):
             inverter_name = inverter_output_names[inverter_id]
-            row_id = i * config.NUM_INVERTER + inverter_id
-            collate.iloc[row_id, :total_feature_len] = df[(feature_names + [inverter_name])].loc[i:i+config.WINDOW_SIZE_INT-1,:].to_numpy().flatten() # write features
-            for output_id in range(config.NUM_OUPUT):
-                avg_output = df[inverter_name][i+config.WINDOW_SIZE_INT + output_id]
-                collate.iloc[row_id, total_feature_len + output_id] = avg_output
 
+            flatten_feature = \
+                list(df[(feature_names + [inverter_name])].loc[i:i+config.WINDOW_SIZE_INT-1,:].to_numpy().flatten()) # write features
+            for output_id in range(config.NUM_OUTPUT):
+                flatten_feature.append(df[inverter_name][i+config.WINDOW_SIZE_INT + output_id])
+            collate.append(flatten_feature)
 
-    # collate.columns = feature_names + ['prev_output'] + [str(i*15) + 'min' for i in range(1, 5)]
-    collate.to_csv('Data/Extract/plant_2_raw_features_label.csv')
-
-
-
-
-    pass
-
+    collate_df = pd.DataFrame(collate, columns=np.arange(len(collate[0])))
+    # collate_df.columns = feature_names + ['prev_output'] + [str(i*15) + 'min' for i in range(1, 5)]
+    collate_df.to_csv('Data/Extract/plant_{}_raw_features_label_fill.csv'.format(plant))
 
 
 
@@ -123,5 +122,8 @@ def collate_input():
 if __name__ == "__main__":
     # format_file(1)
     # format_file(2)
-    # collate_input()
-    fill_missing_data(1)
+    # fill_missing_data(1)
+    # fill_missing_data(2)
+
+    collate_input(1)
+    collate_input(2)
