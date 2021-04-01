@@ -1,0 +1,12 @@
+WINDOW_SIZE_MINUTE = 150
+STEP_SIZE_MINUTE = 15
+WINDOW_SIZE_INT = 10
+STEP_SIZE_INT = 1
+
+NUM_INVERTER = 22
+NUM_OUTPUT = 4
+NUM_FEATURES = 5
+val_split = 0.3
+hidden_dim = 50
+epochs = 50
+batch_size = 4
