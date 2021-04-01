@@ -6,7 +6,10 @@ STEP_SIZE_INT = 1
 NUM_INVERTER = 22
 NUM_OUTPUT = 4
 NUM_FEATURES = 5
-val_split = 0.3
-hidden_dim = 50
-epochs = 50
-batch_size = 4
+LEARNING_RATE = 0.1
+VAL_SPLIT = 0.3
+HIDDEN_DIM = 50
+EPOCHS = 100
+BATCH_SIZE = 64
+
+MODEL_PATH = 'best_model.pt'
