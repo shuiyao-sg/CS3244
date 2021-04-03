@@ -86,7 +86,7 @@ if __name__ == "__main__":
     durations_in_min = [15, 30, 45, 60]
     for col in range(0, 22):
         for row in range(0, 4):
-            header = "DC_" + str(col) + "_post_" + str(durations_in_min[row]) + "_min_forcast"
+            header = "DC_" + str(col) + "_post_" + str(durations_in_min[row]) + "_min_forecast"
             output_column_headers.append(header)
 
     for i in range(0, 2):
