@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 class RawDataset(Dataset):
 
     def __init__(self):
-        self.dataframe = pd.read_csv('../Data/Extract/plant_1_raw_features_label.csv', index_col=0)
+        self.dataframe = pd.read_csv('../Data/Extract/plant_1_raw_features_label_fill.csv', index_col=0)
 
 
 
