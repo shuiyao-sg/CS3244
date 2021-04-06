@@ -16,6 +16,7 @@ class RawDataset(Dataset):
 
 
     def __getitem__(self, idx):
+
         window = self.dataframe.iloc[idx, :-4].to_numpy().reshape(config.WINDOW_SIZE_INT, config.NUM_FEATURES).astype('float32')
         forecast = self.dataframe.iloc[idx, -4:].to_numpy().astype('float32')
         sample = {'window': window, 'forecast': forecast}

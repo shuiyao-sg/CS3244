@@ -1,10 +1,20 @@
+import pickle
+
 import pandas as pd
 import numpy as np
 import os
 import time
 import datetime
+
+import torch
+from torch.utils.data import DataLoader
+
 import config
 from sklearn import preprocessing
+
+from LSTM.dataset import RawDataset
+from LSTM.lstm import LSTMPredictor
+
 
 def str_to_time(time_str, is_sensor, plant):
     time_format = "%Y-%m-%d %H:%M:%S" if (is_sensor or plant==2) else "%d-%m-%Y %H:%M"
@@ -80,7 +90,15 @@ def fill_missing_data(plant):
 
 
 
-def collate_input(plant):
+def collate_lstm_input(plant):
+
+    # get inverter id
+    gen_file_name = "Plant_" + str(plant) + "_Generation_Data.csv"
+    gen_file_path = os.path.join("Data", "Raw", gen_file_name)
+    gen_df = pd.read_csv(gen_file_path)
+    inverter_ids = gen_df.SOURCE_KEY.unique()
+
+    # get_time
     df = pd.read_csv('Data/Extract/plant_{}_collate_raw_filled.csv'.format(plant), index_col=0)
     df['time_feature'] = df['DATE_TIME'].apply(lambda x: get_time_mapping(x))
     feature_names = ["time_feature", "AMBIENT_TEMPERATURE", "MODULE_TEMPERATURE", "IRRADIATION"]
@@ -89,14 +107,23 @@ def collate_input(plant):
     time_df = df[['time']]
 
 
-
-    df = df[col_names]
-    ### scaling
-    x = df.values
+    # scaling features
+    fea_df = df[feature_names]
+    x = fea_df.values
     min_max_scaler = preprocessing.MinMaxScaler()
     x_scaled = min_max_scaler.fit_transform(x)
-    df = pd.DataFrame(x_scaled, columns=col_names)
+    df[feature_names] = pd.DataFrame(x_scaled, columns=feature_names)
 
+    # scaling DC output
+    output_df = df[inverter_output_names].to_numpy()
+    outputs_in_col = output_df.reshape(-1, 1)
+    output_scaler = preprocessing.MinMaxScaler()
+    output_scaler.fit(outputs_in_col)
+    pickle.dump(output_scaler, open('./Data/Extract/scaler_plant_{}.pkl'.format(plant), 'wb'))
+
+    # apply the scaler to every element in the output
+    a = df[inverter_output_names].applymap(lambda x: output_scaler.transform([[x]])[0][0])
+    df[inverter_output_names] = a
 
     collate = []
     for i in range(len(df) - config.WINDOW_SIZE_INT - config.NUM_OUTPUT + 1):
@@ -110,13 +137,55 @@ def collate_input(plant):
                 list(df[(feature_names + [inverter_name])].loc[i:i+config.WINDOW_SIZE_INT-1,:].to_numpy().flatten()) # write features
             for output_id in range(config.NUM_OUTPUT):
                 flatten_feature.append(df[inverter_name][i+config.WINDOW_SIZE_INT + output_id])
-            collate.append(flatten_feature)
+
+            row_list = [time_df['time'].iloc[9], inverter_id, inverter_ids[inverter_id]] + flatten_feature  # window end time
+            collate.append(row_list)
 
     collate_df = pd.DataFrame(collate, columns=np.arange(len(collate[0])))
-    # collate_df.columns = feature_names + ['prev_output'] + [str(i*15) + 'min' for i in range(1, 5)]
-    collate_df.to_csv('Data/Extract/plant_{}_raw_features_label_fill.csv'.format(plant))
+    collate_col_names = ['time', 'inverter_id', 'inverter_source_key'] + \
+                        ['win_' + str(i) for i in range(config.WINDOW_SIZE_INT*5)] + \
+                        ['out_' + str(i) for i in range(config.NUM_OUTPUT)]
+    collate_df.columns = collate_col_names
+    collate_df.to_csv('./Data/Extract/plant_{}_raw_features_label_fill.csv'.format(plant))
 
 
+
+def inference(plant):
+    scalar = pickle.load(open(config.SCALER_PATH.format(plant), 'rb'))
+
+    model = LSTMPredictor()
+    model.load_state_dict(torch.load(config.MODEL_PATH))
+
+
+    dataset = RawDataset(plant)
+    dataloader = DataLoader(dataset, batch_size=1,
+                                     shuffle=False, num_workers=4)
+
+
+
+    counter = 0
+    index = 0
+    with torch.no_grad():
+        for data in dataloader:
+            index += 1
+            inputs = data['window']
+            labels = data['forecast']
+            outputs = model(inputs)
+            # # probability_distribution = torch.nn.functional.softmax(outputs)
+            prediction = np.argmax(outputs.detach().numpy())
+            # print('prediction of MLP model is {}'.format(prediction))
+            # print('label is {}'.format(labels.detach().numpy()[0]))
+            # print('----')
+            if labels.detach().numpy()[0] != prediction:
+                counter += 1
+                print(index)
+                print('prediction of MLP model is {}'.format(prediction))
+                print('label is {}'.format(labels.detach().numpy()[0]))
+                print('----')
+    print(counter)
+
+
+    scalar.inverse_transform()
 
 
 if __name__ == "__main__":
@@ -125,5 +194,5 @@ if __name__ == "__main__":
     # fill_missing_data(1)
     # fill_missing_data(2)
 
-    collate_input(1)
-    collate_input(2)
+    collate_lstm_input(1)
+    collate_lstm_input(2)

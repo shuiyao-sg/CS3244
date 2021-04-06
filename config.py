@@ -12,4 +12,5 @@ HIDDEN_DIM = 50
 EPOCHS = 100
 BATCH_SIZE = 64
 
+SCALER_PATH = '../Data/Extract/scaler_plant_{}.pkl'
 MODEL_PATH = 'best_model.pt'
