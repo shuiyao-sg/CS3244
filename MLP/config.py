@@ -1,0 +1,13 @@
+# training related
+PRINT_FREQ = 100
+BATCH_SIZE = 256
+WORKERS = 4
+
+INPUT_SIZE = None
+OUTPUT_SIZE = None
+
+TOTAL_EPOCH = 100
+LEARNING_RATE = 0.001
+
+BEST_MODEL_DIR = './best_model.pt'
+
