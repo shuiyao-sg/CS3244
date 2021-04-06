@@ -138,55 +138,65 @@ def collate_lstm_input(plant):
             for output_id in range(config.NUM_OUTPUT):
                 flatten_feature.append(df[inverter_name][i+config.WINDOW_SIZE_INT + output_id])
 
-            row_list = [time_df['time'].iloc[9], inverter_id, inverter_ids[inverter_id]] + flatten_feature  # window end time
+            row_list = [time_df.loc[i+config.WINDOW_SIZE_INT-1, 'time'], inverter_id, inverter_ids[inverter_id]] + flatten_feature  # window end time
             collate.append(row_list)
 
     collate_df = pd.DataFrame(collate, columns=np.arange(len(collate[0])))
     collate_col_names = ['time', 'inverter_id', 'inverter_source_key'] + \
-                        ['win_' + str(i) for i in range(config.WINDOW_SIZE_INT*5)] + \
+                        ['win_' + str(i) for i in range(config.WINDOW_SIZE_INT*config.NUM_FEATURES)] + \
                         ['out_' + str(i) for i in range(config.NUM_OUTPUT)]
     collate_df.columns = collate_col_names
-    collate_df.to_csv('./Data/Extract/plant_{}_raw_features_label_fill.csv'.format(plant))
+    collate_df.to_csv('Data/Extract/plant_{}_raw_features_label_fill.csv'.format(plant))
 
 
 
 def inference(plant):
-    scalar = pickle.load(open(config.SCALER_PATH.format(plant), 'rb'))
+    scaler = pickle.load(open(config.SCALER_PATH.format(plant), 'rb'))
 
-    model = LSTMPredictor()
-    model.load_state_dict(torch.load(config.MODEL_PATH))
+    model = LSTMPredictor(config.NUM_FEATURES, config.HIDDEN_DIM, config.NUM_OUTPUT)
+    model.load_state_dict(torch.load(config.MODEL_PATH, map_location=torch.device('cpu')))
 
 
     dataset = RawDataset(plant)
     dataloader = DataLoader(dataset, batch_size=1,
                                      shuffle=False, num_workers=4)
 
+    gen_file_name = "Plant_" + str(plant) + "_Generation_Data.csv"
+    gen_file_path = os.path.join("Data", "Raw", gen_file_name)
+    gen_df = pd.read_csv(gen_file_path)
+    gen_df['time'] = gen_df['DATE_TIME'].apply(lambda x: str_to_time(x, False, plant))
+    inverter_ids = gen_df.SOURCE_KEY.unique()
 
+    for i in range(config.NUM_OUTPUT):
+        gen_df['pred_' + str(i)] = np.nan
 
-    counter = 0
-    index = 0
+    forecast_idx = [0 for i in range(config.NUM_OUTPUT)]
+
     with torch.no_grad():
         for data in dataloader:
-            index += 1
-            inputs = data['window']
-            labels = data['forecast']
-            outputs = model(inputs)
-            # # probability_distribution = torch.nn.functional.softmax(outputs)
-            prediction = np.argmax(outputs.detach().numpy())
-            # print('prediction of MLP model is {}'.format(prediction))
-            # print('label is {}'.format(labels.detach().numpy()[0]))
-            # print('----')
-            if labels.detach().numpy()[0] != prediction:
-                counter += 1
-                print(index)
-                print('prediction of MLP model is {}'.format(prediction))
-                print('label is {}'.format(labels.detach().numpy()[0]))
-                print('----')
-    print(counter)
+            data_time = data['time']
 
+            outputs = model(data['window'])
+            outputs = scaler.inverse_transform(outputs.reshape(-1,1))
 
-    scalar.inverse_transform()
+            for i in range(config.NUM_OUTPUT):
+                idx = forecast_idx[i]
 
+                forecast_time = data_time.numpy()[0] + 900 *(i+1)
+                inverter_source_key = data['inverter_source_key'][0]
+                inverter_id = data['inverter_id'].numpy()[0]
+                while gen_df['time'][idx] < forecast_time:
+                    idx += 1
+                forecast_idx[i] = idx
+
+                curr_gen_df = gen_df[idx: idx+config.NUM_INVERTER]
+                idx_candidates = curr_gen_df[((curr_gen_df['time'] == forecast_time) & (curr_gen_df['SOURCE_KEY'] == inverter_source_key))].index.values
+                if len(idx_candidates) == 0:
+                    continue
+                idx = idx_candidates[0]
+                gen_df.loc[idx, 'pred_' + str(i)] = outputs[i][0]
+
+    gen_df.to_csv('Data/Extract/lstm_revert_plant_{}'.format(i))
 
 if __name__ == "__main__":
     # format_file(1)
@@ -194,5 +204,7 @@ if __name__ == "__main__":
     # fill_missing_data(1)
     # fill_missing_data(2)
 
-    collate_lstm_input(1)
+    # collate_lstm_input(1)
     collate_lstm_input(2)
+    inference(1)
+    inference(2)
