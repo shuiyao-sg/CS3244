@@ -8,9 +8,10 @@ import datetime
 
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
+from sklearn import preprocessing
 
 import config
-from sklearn import preprocessing
 
 from LSTM.dataset import RawDataset
 from LSTM.lstm import LSTMPredictor
@@ -153,8 +154,9 @@ def collate_lstm_input(plant):
 def inference(plant):
     scaler = pickle.load(open(config.SCALER_PATH.format(plant), 'rb'))
 
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = LSTMPredictor(config.NUM_FEATURES, config.HIDDEN_DIM, config.NUM_OUTPUT)
-    model.load_state_dict(torch.load(config.MODEL_PATH, map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load(config.MODEL_PATH, map_location=torch.device(device)))
 
 
     dataset = RawDataset(plant)
@@ -173,7 +175,7 @@ def inference(plant):
     forecast_idx = [0 for i in range(config.NUM_OUTPUT)]
 
     with torch.no_grad():
-        for data in dataloader:
+        for data in tqdm(dataloader):
             data_time = data['time']
 
             outputs = model(data['window'])
@@ -196,7 +198,7 @@ def inference(plant):
                 idx = idx_candidates[0]
                 gen_df.loc[idx, 'pred_' + str(i)] = outputs[i][0]
 
-    gen_df.to_csv('Data/Extract/lstm_revert_plant_{}'.format(i))
+    gen_df.to_csv('Data/Extract/lstm_revert_plant_{}.csv'.format(plant))
 
 if __name__ == "__main__":
     # format_file(1)

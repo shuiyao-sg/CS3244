@@ -1,5 +1,6 @@
 import time
 import torch
+import numpy as np
 
 import config
 
@@ -7,6 +8,7 @@ def train(train_loader, model, criterion, optimizer, epoch, device='cuda', write
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
+    outputs = None
 
     # switch to train mode
     model.train()
@@ -22,6 +24,10 @@ def train(train_loader, model, criterion, optimizer, epoch, device='cuda', write
 
         # compute output
         output = model(input)
+        if outputs is not None:
+            outputs = np.vstack([outputs, output.detach().to('cpu').numpy()])
+        else:
+            outputs = output.detach().to('cpu').numpy()
 
         # measure accuracy and record loss
         loss = criterion(output, target)
@@ -52,12 +58,13 @@ def train(train_loader, model, criterion, optimizer, epoch, device='cuda', write
                 global_steps = writer_dict['train_global_steps']
                 writer.add_scalar('train_loss', losses.val, global_steps)
                 writer_dict['train_global_steps'] = global_steps + 1
-    return losses.avg
+    return losses.avg, outputs
 
 
 def validate(val_loader, model, criterion, device='cuda', writer_dict=None):
     batch_time = AverageMeter()
     losses = AverageMeter()
+    outputs = None
 
     # switch to evaluate mode
     model.eval()
@@ -70,6 +77,10 @@ def validate(val_loader, model, criterion, device='cuda', writer_dict=None):
 
             # compute output
             output = model(input)
+            if outputs is not None:
+                outputs = np.vstack([outputs, output.detach().to('cpu').numpy()])
+            else:
+                outputs = output.detach().to('cpu').numpy()
 
             # measure accuracy and record loss
             loss = criterion(output, target)
@@ -89,7 +100,7 @@ def validate(val_loader, model, criterion, device='cuda', writer_dict=None):
             global_steps = writer_dict['valid_global_steps']
             writer_dict['valid_global_steps'] = global_steps + 1
 
-    return losses.avg
+    return losses.avg, outputs
 
 
 class AverageMeter(object):
