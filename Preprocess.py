@@ -208,7 +208,7 @@ def plot_graph():
     fig, ax = plt.subplots(3)
     plt.subplots_adjust(hspace = 0.5) #Space between each subplot, can be adjusted
     title_fontsize = 12
-    files = ['./Data/Plot/lstm_revert_plant_1.csv', './Data/Plot/lstm_revert_plant_1.csv', './Data/Plot/lstm_revert_plant_1.csv']
+    files = ['./Data/Plot/benchmark_plant_1.csv', './Data/Plot/mlp_revert_plant_1.csv', './Data/Plot/lstm_revert_plant_1.csv']
     titles = ['Benchmark', 'MLP', 'LSTM']
     source_key = 'adLQvlD726eNBSB'
 
