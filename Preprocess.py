@@ -8,7 +8,9 @@ import datetime
 
 import torch
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+# from tqdm import tqdm
+import matplotlib.pyplot as plt
+from matplotlib.pyplot import plot
 from sklearn import preprocessing
 
 import config
@@ -200,13 +202,45 @@ def inference(plant):
 
     gen_df.to_csv('Data/Extract/lstm_revert_plant_{}.csv'.format(plant))
 
+
+
+def plot_graph():
+    fig, ax = plt.subplots(3)
+    plt.subplots_adjust(hspace = 0.5) #Space between each subplot, can be adjusted
+    title_fontsize = 12
+    files = ['./Data/Plot/lstm_revert_plant_1.csv', './Data/Plot/lstm_revert_plant_1.csv', './Data/Plot/lstm_revert_plant_1.csv']
+    titles = ['Benchmark', 'MLP', 'LSTM']
+    source_key = 'adLQvlD726eNBSB'
+
+    for i in range(3):
+        df = pd.read_csv(files[i])
+        df = df[60500:]
+        df = df[df['SOURCE_KEY'] == source_key]
+        dc = df['DC_POWER'].to_numpy().flatten()
+        dc[dc<0] = 0
+        forecast = df['pred_0'].to_numpy().flatten()
+        forecast[forecast<0] = 0
+        diff = np.abs(forecast - dc)
+
+        x = np.arange(len(forecast))
+        ax[i].fill_between(x, dc, alpha=0.6, color='C4',edgecolor="b", linewidth=0.0, label='Actual Output')
+        ax[i].fill_between(x, forecast, alpha=0.6, color='C5',edgecolor="b", linewidth=0.0, label='15mins Forecast')
+        ax[i].fill_between(x, diff, alpha=0.6, color='C1',edgecolor="b", linewidth=0.0, label='Loss')
+        ax[i].set_title(titles[i], fontsize=title_fontsize)
+    #indigo, oliv, tomato
+    ax[0].legend(loc='best')
+    plt.show()
+    pass
+
+
 if __name__ == "__main__":
+    plot_graph()
     # format_file(1)
     # format_file(2)
     # fill_missing_data(1)
     # fill_missing_data(2)
 
     # collate_lstm_input(1)
-    collate_lstm_input(2)
-    inference(1)
-    inference(2)
+    # collate_lstm_input(2)
+    # inference(1)
+    # inference(2)
